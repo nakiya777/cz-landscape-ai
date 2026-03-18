@@ -344,6 +344,7 @@ export default function App() {
         <MeasureDialog
           measureInputRef={measureInputRef}
           tempMeasureDistance={tempMeasureDistance}
+          isOpen={showMeasureDialog}
           onClose={() => { setShowMeasureDialog(false); setMeasurePoints([]); }}
           onConfirm={(val) => {
             if (val > 0 && tempMeasureDistance) setPixelsPerMeter(tempMeasureDistance / val);
