@@ -40,7 +40,8 @@ export default function App() {
     isChatOpen, activeTab, setActiveTab,
     showApiKeyDialog, setShowApiKeyDialog,
     showAISettings, setShowAISettings,
-    detectionModel
+    detectionModel,
+    addItem, deleteItem, handleMoveLayer
   } = useAppContext();
 
   const [showPromptDialog, setShowPromptDialog] = useState(false);
@@ -102,49 +103,6 @@ export default function App() {
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const addItem = (itemData: PlantData | ExteriorData | CustomAssetData, type: 'plant' | 'exterior' | 'custom_image', initialParams?: { x: number, y: number, w: number, h: number, points?: { x: number, y: number }[] }) => {
-    let pixelWidth = 0, pixelHeight = 0, startX = 250, startY = 200;
-    let points = initialParams?.points;
-    if (initialParams) {
-      pixelWidth = initialParams.w; pixelHeight = initialParams.h;
-      startX = initialParams.x; startY = initialParams.y;
-    } else {
-      let wMeter = 1.0, hMeter = 1.0;
-      if (type === 'plant') {
-        const p = itemData as PlantData;
-        wMeter = p.width || 1.0; hMeter = p.height || 1.0;
-      } else if (type === 'exterior') {
-        const e = itemData as ExteriorData;
-        wMeter = e.defaultSize.w; hMeter = e.defaultSize.h;
-      }
-      pixelWidth = wMeter * pixelsPerMeter; pixelHeight = hMeter * pixelsPerMeter;
-    }
-    const newItem = {
-      id: Date.now().toString(),
-      type, x: startX, y: startY, width: pixelWidth, height: pixelHeight,
-      rotation: 0, zIndex: items.length + 1, data: itemData, polygonPoints: points
-    } as CanvasItem;
-    const newItems = [...items, newItem];
-    setItems(newItems); recordHistory(newItems); setSelectedId(newItem.id); setToolMode('select');
-  };
-
-  const deleteItem = () => {
-    if (selectedId) {
-      const newItems = items.filter(i => i.id !== selectedId);
-      setItems(newItems); recordHistory(newItems); setSelectedId(null);
-    }
-  };
-
-  const handleMoveLayer = (direction: 'up' | 'down') => {
-    const idx = items.findIndex(i => i.id === selectedId);
-    if (idx === -1) return;
-    const newItems = [...items];
-    const item = newItems.splice(idx, 1)[0];
-    if (direction === 'up') newItems.push(item);
-    else newItems.unshift(item);
-    setItems(newItems); recordHistory(newItems);
   };
 
   const handleApiKeyError = () => {
