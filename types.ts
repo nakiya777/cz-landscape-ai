@@ -97,7 +97,7 @@ export interface MeasurePoint {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user';
+  role: 'system' | 'user' | 'model';
   text: string;
 }
 
