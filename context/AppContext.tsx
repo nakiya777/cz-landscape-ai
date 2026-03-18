@@ -211,10 +211,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         try {
             const aiResponse = await chatWithGemini(newMessages);
+            console.debug('[AppContext] sendChatMessage 成功: レスポンス受信');
             setChatMessages(prev => [...prev, { role: 'model', text: aiResponse }]);
-        } catch (error) {
-            console.error("Chat Error:", error);
-            setChatMessages(prev => [...prev, { role: 'model', text: "すみません、エラーが発生しました。" }]);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error('[AppContext] sendChatMessage エラー:', message);
+            console.debug('[AppContext] sendChatMessage エラー詳細:', error);
+            // エラーメッセージをシステムメッセージとしてチャットに追加
+            setChatMessages(prev => [...prev, { role: 'system', text: `エラーが発生しました: ${message}` }]);
         } finally {
             setIsGeneratingChat(false);
         }

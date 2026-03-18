@@ -34,12 +34,14 @@ export const chatWithGemini = async (
     const result = await chat.sendMessage(lastMessage.text);
     const response = await result.response;
     return response.text();
-  } catch (error: any) {
-    console.error("Gemini Chat API Error:", error);
-    if (error.message === "API_KEY_ERROR" || error.message?.includes("403") || error.message?.includes("permission") || error.message?.includes("key")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[geminiService] chatWithGemini エラー:', message);
+    console.debug('[geminiService] chatWithGemini エラー詳細:', error);
+    if (message === "API_KEY_ERROR" || message?.includes("403") || message?.includes("API key") || message?.includes("permission") || message?.includes("key")) {
       throw new Error("API_KEY_ERROR");
     }
-    return `エラーが発生しました: ${(error as Error).message}`;
+    throw new Error(message);
   }
 };
 
