@@ -33,6 +33,28 @@ export const renderSceneToBase64 = async (
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
+  // カスタム画像をプリロード（並列化でパフォーマンス向上）
+  const imageCache = new Map<string, HTMLImageElement>();
+  const customImageItems = items.filter(item => item.type === 'custom_image');
+  if (customImageItems.length > 0) {
+    console.debug(`[canvas] カスタム画像 ${customImageItems.length} 件を並列プリロード開始`);
+    const preloadPromises = customImageItems.map(item => new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        imageCache.set(item.id, img);
+        console.debug(`[canvas] 画像プリロード完了: ${item.id}`);
+        resolve();
+      };
+      img.onerror = () => {
+        console.error(`[canvas] 画像プリロード失敗: ${item.id}`);
+        resolve();
+      };
+      img.src = (item.data as CustomAssetData).image;
+    }));
+    await Promise.all(preloadPromises);
+    console.debug(`[canvas] 全カスタム画像のプリロード完了 (${imageCache.size}/${customImageItems.length} 成功)`);
+  }
+
   if (bgImage) {
     await new Promise<void>((resolve) => {
       const img = new Image();
@@ -79,15 +101,13 @@ export const renderSceneToBase64 = async (
       ctx.fillRect(0, 0, item.width, item.height);
       ctx.strokeRect(0, 0, item.width, item.height);
     } else if (item.type === 'custom_image') {
-      const img = new Image();
-      await new Promise<void>((r) => {
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, item.width, item.height);
-          r();
-        };
-        img.onerror = () => r();
-        img.src = (item.data as CustomAssetData).image;
-      });
+      // プリロード済みキャッシュから同期的に描画（z-order維持）
+      const cachedImg = imageCache.get(item.id);
+      if (cachedImg) {
+        ctx.drawImage(cachedImg, 0, 0, item.width, item.height);
+      } else {
+        console.debug(`[canvas] キャッシュミス（プリロード失敗）: ${item.id}`);
+      }
     }
     ctx.restore();
   }
