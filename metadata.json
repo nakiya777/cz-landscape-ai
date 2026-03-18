@@ -1,0 +1,5 @@
+{
+  "name": "CZ Landscape AI",
+  "description": "AI-powered exterior landscape design tool. Place plants and exterior items on your site plan and generate realistic visualizations using Google Gemini.",
+  "requestFramePermissions": []
+}
