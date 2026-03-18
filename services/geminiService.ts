@@ -88,11 +88,18 @@ export const generateImageResponse = async (
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Use the user-selected model directly - user has full control
+    // Imagen 3 はテキスト専用モデル: 参照画像を送らない
+    const isTextOnlyModel = modelName === 'imagen-3.0-generate-002';
+    if (isTextOnlyModel) {
+      console.debug('[geminiService] Imagen 3 テキスト専用モード: 参照画像をスキップ');
+    }
+
     const model = genAI.getGenerativeModel({ model: modelName });
 
     const parts: ({ text: string } | { inlineData: { mimeType: string, data: string } })[] = [];
-    if (referenceImageBase64) {
+
+    if (referenceImageBase64 && !isTextOnlyModel) {
+      // Gemini系: 参照画像 + プロンプト
       const base64Data = referenceImageBase64.split(',')[1] || referenceImageBase64;
       parts.push({
         inlineData: {
@@ -101,39 +108,48 @@ export const generateImageResponse = async (
         }
       });
       parts.push({
-        text: `[STRUCTURAL CONSTRAINT] The following reference image is a strict spatial blueprint. 
-            Render each element exactly within its designated transparent or white overlay zone. 
-            Respect the scale, orientation, and relative positions of all marked objects. 
-            Do not shift, remove, or reposition any outlined structure. 
+        text: `[STRUCTURAL CONSTRAINT] The following reference image is a strict spatial blueprint.
+            Render each element exactly within its designated transparent or white overlay zone.
+            Respect the scale, orientation, and relative positions of all marked objects.
+            Do not shift, remove, or reposition any outlined structure.
             Transform this plan into a photorealistic visualization based on this prompt: ${prompt}`
       });
     } else {
+      // Imagen 3 または参照画像なし: テキストのみ
       parts.push({ text: prompt });
     }
+
+    console.debug('[geminiService] generateContent 呼び出し: model=%s, parts=%d, hasImage=%s',
+      modelName, parts.length, !!(referenceImageBase64 && !isTextOnlyModel));
 
     const result = await model.generateContent(parts as any);
     const response = await result.response;
 
-    // Check for standard text response first
-    // Note: Gemini standard models return text. If the model happens to return image data in parts (unlikely for standard endpoints), we check it.
-    // Since official Image Generation usually requires specific handling (Imagen), this might just return text description.
-    // For now we return null if no image data found, consistent with previous fallback.
-
-    // Attempt to find inline data in candidates (if supported by experimental models)
+    // レスポンスから画像データを検索
+    // Gemini系モデルはcandidatesのinlineDataで画像を返す
     if (response.candidates && response.candidates.length > 0) {
       const contentParts = response.candidates[0].content?.parts;
       if (contentParts) {
         for (const part of contentParts) {
           if (part.inlineData && part.inlineData.data) {
+            console.debug('[geminiService] 画像データ取得成功: mimeType=%s', part.inlineData.mimeType);
             return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           }
         }
       }
     }
 
+    console.debug('[geminiService] レスポンスに画像データが含まれていません');
     return null;
   } catch (error: any) {
-    console.error("Gemini Image Gen Error:", error);
+    console.error("[geminiService] 画像生成エラー:", error);
+
+    // Imagen 3 フォールバック: エラー時に gemini-3-pro-image-preview にフォールバック
+    if (modelName === 'imagen-3.0-generate-002' && error.message !== "API_KEY_ERROR") {
+      console.debug('[geminiService] Imagen 3 失敗。gemini-3-pro-image-preview にフォールバック');
+      return generateImageResponse(prompt, referenceImageBase64, 'gemini-3-pro-image-preview');
+    }
+
     if (error.message === "API_KEY_ERROR" || error.message?.includes("403") || error.message?.includes("permission") || error.message?.includes("key")) {
       throw new Error("API_KEY_ERROR");
     }

@@ -15,7 +15,7 @@ import { useHistory } from './hooks/useHistory';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import ChatSidebar from './components/ChatSidebar';
 import { renderSceneToBase64 } from './utils/canvas';
-import { generateAutoPrompt } from './utils/prompt';
+import { generateAutoPrompt, PromptGenerationInput } from './utils/prompt';
 import { useAppContext } from './context/AppContext';
 
 import {
@@ -62,13 +62,24 @@ export default function App() {
   // --- Effects ---
   useEffect(() => {
     if (showPromptDialog) {
-      const prompt = generateAutoPrompt(
-        viewType, season, time, buildingCategory, buildingStyle,
-        buildingFloors, items, pixelsPerMeter
-      );
+      const isTextOnly = imageModel === 'imagen-3.0-generate-002';
+      const promptInput: PromptGenerationInput = {
+        camera,
+        items,
+        pixelsPerMeter,
+        viewType,
+        season,
+        time,
+        buildingCategory,
+        buildingStyle,
+        buildingFloors,
+        isTextOnlyModel: isTextOnly,
+      };
+      console.debug('[App] プロンプト自動生成: isTextOnly=%s, camera=%s', isTextOnly, camera ? 'あり' : 'なし');
+      const prompt = generateAutoPrompt(promptInput);
       setFinalPrompt(prompt);
     }
-  }, [showPromptDialog, viewType, season, time, buildingCategory, buildingStyle, buildingFloors, items, pixelsPerMeter]);
+  }, [showPromptDialog, viewType, season, time, buildingCategory, buildingStyle, buildingFloors, items, pixelsPerMeter, camera, imageModel]);
 
   // --- Handlers ---
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,7 +207,11 @@ export default function App() {
       if (imageModel === 'gemini-3-pro-image-preview') {
         if (aistudio && !await aistudio.hasSelectedApiKey()) { await aistudio.openSelectKey(); }
       }
-      const refImage = await renderSceneToBase64(bgImage, items, pixelsPerMeter, 1024, 768);
+      const isTextOnly = imageModel === 'imagen-3.0-generate-002';
+      const refImage = isTextOnly
+        ? null  // Imagen 3: 参照画像不要
+        : await renderSceneToBase64(bgImage, items, pixelsPerMeter, 1024, 768, camera, true);
+      console.debug('[App] 画像生成開始: model=%s, hasRefImage=%s', imageModel, !!refImage);
       const base64Image = await generateImageResponse(finalPrompt, refImage, imageModel);
       if (base64Image) setGeneratedImage(base64Image); else alert("画像生成失敗");
     } catch (e: any) {
