@@ -83,6 +83,10 @@ export default function App() {
         setMeasurePoints([]);
         recordHistory([]);
       };
+      reader.onerror = () => {
+        console.error('[App] 画像の読み込みに失敗しました');
+        alert('画像の読み込みに失敗しました。');
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -100,6 +104,10 @@ export default function App() {
           en: `Custom asset image: ${file.name}`
         };
         setCustomAssets(prev => [...prev, newAsset]);
+      };
+      reader.onerror = () => {
+        console.error('[App] 画像の読み込みに失敗しました');
+        alert('画像の読み込みに失敗しました。');
       };
       reader.readAsDataURL(file);
     }
