@@ -1,5 +1,6 @@
 
-import { CanvasItem, CustomAssetData } from '../types';
+import { CanvasItem, CameraState, CustomAssetData } from '../types';
+import { calculateVisibleBuildingFaces, CAMERA_FOV_DEG } from './spatial';
 
 /**
  * Calculates the closest point on a line segment to a given point.
@@ -25,7 +26,9 @@ export const renderSceneToBase64 = async (
   items: CanvasItem[],
   pixelsPerMeter: number,
   width: number,
-  height: number
+  height: number,
+  camera?: CameraState | null,
+  annotate?: boolean
 ): Promise<string | null> => {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -111,5 +114,94 @@ export const renderSceneToBase64 = async (
     }
     ctx.restore();
   }
+
+  // アノテーション描画パス
+  if (annotate) {
+    console.debug('[canvas] アノテーション描画開始');
+
+    // 各アイテムにラベルを描画
+    for (const item of items) {
+      const cx = item.x + item.width / 2;
+      const cy = item.y + item.height; // アイテム下部
+
+      ctx.save();
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+
+      // 半透明背景
+      const label = item.data.en;
+      const textMetrics = ctx.measureText(label);
+      const bgWidth = textMetrics.width + 6;
+      const bgHeight = 14;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(cx - bgWidth / 2, cy + 2, bgWidth, bgHeight);
+
+      // 白文字ラベル
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(label, cx, cy + 13);
+      ctx.restore();
+    }
+
+    // カメラ位置と視野角を描画
+    if (camera) {
+      ctx.save();
+
+      // カメラアイコン（小さい丸）
+      ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
+      ctx.beginPath();
+      ctx.arc(camera.x, camera.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // CAMラベル
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText('CAM', camera.x, camera.y - 10);
+
+      // 視野角の扇形を描画
+      // カメラ回転: 0°=北(上), 時計回り → Canvas: 0°=右, 反時計回り
+      // 変換: canvasAngle = (rotation - 90) * PI / 180
+      const fovRad = (CAMERA_FOV_DEG / 2) * (Math.PI / 180);
+      const cameraAngleRad = ((camera.rotation - 90) * Math.PI) / 180;
+      const fovLength = 80; // 視野線の長さ（ピクセル）
+
+      ctx.strokeStyle = 'rgba(255, 200, 0, 0.4)';
+      ctx.fillStyle = 'rgba(255, 200, 0, 0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(camera.x, camera.y);
+      ctx.arc(camera.x, camera.y, fovLength, cameraAngleRad - fovRad, cameraAngleRad + fovRad);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // 建物ポリゴンの可視面をハイライト
+    if (camera) {
+      for (const item of items) {
+        if (!item.polygonPoints || item.polygonPoints.length < 3) continue;
+
+        const visibleFaces = calculateVisibleBuildingFaces(camera, item, pixelsPerMeter);
+        for (const face of visibleFaces) {
+          const p1 = item.polygonPoints[face.edgeIndex];
+          const p2 = item.polygonPoints[(face.edgeIndex + 1) % item.polygonPoints.length];
+
+          ctx.save();
+          ctx.strokeStyle = 'rgba(0, 200, 255, 0.8)'; // 水色
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(item.x + p1.x, item.y + p1.y);
+          ctx.lineTo(item.x + p2.x, item.y + p2.y);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    console.debug('[canvas] アノテーション描画完了');
+  }
+
   return canvas.toDataURL('image/png');
 };
