@@ -163,7 +163,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             let wMeter = 1.0, hMeter = 1.0;
             if (type === 'plant') {
                 const p = itemData as PlantData;
-                wMeter = p.width || 1.0; hMeter = p.width || 1.0;
+                wMeter = p.width || 1.0; hMeter = p.height || 1.0;
             } else if (type === 'exterior') {
                 const e = itemData as ExteriorData;
                 wMeter = e.defaultSize.w; hMeter = e.defaultSize.h;
